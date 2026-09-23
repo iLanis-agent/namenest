@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NameNest - only the names you both love</title>
+<style>
+  :root { --ink:#2b2430; --muted:#7c7482; --accent:#9b5de5; --accent-dk:#7d44c2; --card:#ffffff; --bg:#faf8fc; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--ink); }
+  .wrap { max-width:680px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { font-size:28px; margin:0 0 6px; }
+  .tag { color:var(--muted); margin:0 0 20px; line-height:1.45; }
+  .card { background:var(--card); border:1px solid #e9e2f0; border-radius:14px; padding:18px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+  label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  input { padding:9px 10px; border:1px solid #ddd2e8; border-radius:8px; font-size:15px; background:#fff; }
+  input[type=text] { width:200px; }
+  button { padding:10px 16px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-size:15px; cursor:pointer; }
+  button:hover { background:var(--accent-dk); }
+  button.ghost { background:#f1eaf9; color:var(--ink); }
+  button.ghost:hover { background:#e4d9f2; }
+  .switch { display:flex; gap:8px; margin-bottom:14px; }
+  .switch button { flex:1; padding:12px; background:#f1eaf9; color:var(--ink); font-weight:600; }
+  .switch button.active { background:var(--accent); color:#fff; }
+  .privacy { text-align:center; color:var(--muted); font-size:13.5px; margin-bottom:14px; }
+  .names { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .chip { display:inline-flex; align-items:center; gap:8px; background:#f6f1fc; border:1px solid #e4d9f2; border-radius:999px; padding:6px 8px 6px 14px; font-size:15px; }
+  .chip button { padding:2px 9px; font-size:13px; border-radius:999px; background:#e4d9f2; color:var(--ink); }
+  .matches { text-align:center; padding:24px 14px; }
+  .matches .count { font-size:40px; font-weight:700; color:var(--accent-dk); }
+  .matches .sub { color:var(--muted); font-size:14px; margin-top:2px; }
+  .matchlist { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:14px; }
+  .match { background:#e9f7ef; border:1px solid #c9e8d4; color:#22633c; border-radius:999px; padding:8px 16px; font-size:17px; font-weight:700; }
+  .empty { color:var(--muted); font-size:15px; text-align:center; padding:12px 0 0; }
+  .stats { text-align:center; color:var(--muted); font-size:14px; margin-top:10px; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>NameNest</h1>
+  <p class="tag">Naming a baby with a partner is a minefield of vetoes. NameNest keeps each person's likes private and reveals only the names you both picked - so "absolutely not" never has to be said out loud.</p>
+
+  <div class="card matches">
+    <div class="count" id="mCount">0</div>
+    <div class="sub">mutual matches</div>
+    <div class="matchlist" id="mList"></div>
+    <div class="empty hidden" id="mEmpty">No overlaps yet. Keep adding - matches appear here the moment you both like the same name.</div>
+    <div class="stats" id="mStats"></div>
+  </div>
+
+  <div class="switch">
+    <button id="tabA" class="active">Partner A's private list</button>
+    <button id="tabB">Partner B's private list</button>
+  </div>
+  <div class="privacy" id="privLine">You are viewing Partner A's list. Partner B's picks stay hidden - that is the whole point.</div>
+
+  <div class="card">
+    <div class="row">
+      <div><label for="name">Add a name you like</label><input type="text" id="name" placeholder="Noa"></div>
+      <button id="addBtn">Like it</button>
+    </div>
+    <div class="names" id="myList"></div>
+    <div class="empty hidden" id="myEmpty">Nothing liked yet on this list.</div>
+  </div>
+</div>
+<script src="engine.js"></script>
+<script>
+(function(){
+  var E = NameNestEngine;
+  var KEY = 'namenest.v1';
+  var st = {a:[], b:[]};
+  try { var s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s && s.a && s.b) st = s; } catch(e){}
+  var side = 'a';
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(st)); } catch(e){} }
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  function render(){
+    var m = E.matches(st.a, st.b);
+    var stt = E.stats(st.a, st.b);
+    $('mCount').textContent = m.length;
+    $('mList').innerHTML = m.map(function(n){ return '<span class="match">' + esc(n) + '</span>'; }).join('');
+    $('mEmpty').classList.toggle('hidden', m.length > 0);
+    $('mStats').textContent = stt.a + ' liked by A - ' + stt.b + ' liked by B';
+    $('tabA').classList.toggle('active', side === 'a');
+    $('tabB').classList.toggle('active', side === 'b');
+    var other = side === 'a' ? 'B' : 'A';
+    $('privLine').textContent = 'You are viewing Partner ' + side.toUpperCase() + '\'s list. Partner ' + other + '\'s picks stay hidden - that is the whole point.';
+    var mine = st[side];
+    $('myList').innerHTML = mine.map(function(n){
+      return '<span class="chip">' + esc(n) + '<button data-n="' + esc(n) + '">x</button></span>';
+    }).join('');
+    $('myEmpty').classList.toggle('hidden', mine.length > 0);
+  }
+
+  $('tabA').addEventListener('click', function(){ side = 'a'; render(); });
+  $('tabB').addEventListener('click', function(){ side = 'b'; render(); });
+
+  $('addBtn').addEventListener('click', function(){
+    var r = E.add(st[side], $('name').value);
+    if (r.added){ st[side] = r.list; $('name').value = ''; save(); render(); }
+  });
+  $('name').addEventListener('keydown', function(ev){ if (ev.key === 'Enter') $('addBtn').click(); });
+
+  $('myList').addEventListener('click', function(ev){
+    var btn = ev.target.closest('button'); if (!btn) return;
+    st[side] = E.remove(st[side], btn.getAttribute('data-n'));
+    save(); render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
